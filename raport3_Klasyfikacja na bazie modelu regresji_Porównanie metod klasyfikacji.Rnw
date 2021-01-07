@@ -1,0 +1,859 @@
+\documentclass[12pt, a4paper]{article}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% dodatkowe pakiety LaTeX'a
+\usepackage[OT4]{polski}
+\usepackage[utf8]{inputenc}
+\usepackage[top=2.5cm, bottom=2.5cm, left=2cm, right=2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage[colorlinks=true, linkcolor=blue]{hyperref}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ustawienia globalne
+<<ustawienia_globalne, echo=FALSE, warning=FALSE, message=FALSE>>=
+library(knitr)
+library(datasets)
+library(xtable) 
+library(dplyr)
+library(plyr)
+library(moments)
+library(e1071)
+library(MASS)
+library(cluster)
+library(corrplot)
+
+opts_chunk$set(fig.path='figure/', fig.align='center', fig.pos='H',fig.width=5, fig.height=4)
+
+@
+
+\begin{document}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% strona tytulowa
+
+\title{Raport 3 \\ Klasyfikacja na bazie modelu regresji \\ PorĂłwnanie metod klasyfikacji}
+
+\author{Romana Ĺ»muda & 249706 \\ Adrian Kit  & 249746}
+
+\maketitle
+\tableofcontents
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{WstÄ™p - wprowadzenie do podanych zagadnieĹ„}
+W tym sprawozdaniu bÄ™dziemy badali dwa zbiory danych. Pierwszy z nich, podobnie jak w poprzednim raporcie, dotyczy kwiatkĂłw irysĂłw. W drugim zadaniu moĹĽemy wybraÄ‡ spoĹ›rĂłd piÄ™ciu zbiorĂłw. ZdecydowaliĹ›my siÄ™ na zbiĂłr o winach.
+\newpage Celem raportu jest:
+\begin{itemize}
+\item Klasyfikacja na bazie modelu regresji liniowej
+\item PorĂłwnanie wybranych metod klasyfikacji 
+\end{itemize}
+PoniĹĽej zamieĹ›ciliĹ›my krĂłtkie charakteryzacje metod wykorzystanych w raporcie.
+
+\subsection{Opis wybranych pojÄ™Ä‡}
+\begin{itemize}
+\item \textsl{{\large Klasyfikacja}} \newline
+Klasyfikacja danych to metoda, ktĂłra umoĹĽliwia tworzenie klasyfikatorĂłw. Klasyfikator to pewna funkcja (zazwyczaj w postaci algorytmu lub programu komputerowego), ktĂłra przypisuje analizowane obiekty do jednej z rozpatrywanych klas.
+Zazwyczaj klasyfikator konstruuje siÄ™ na podstawie pewnego zbioru danych uczÄ…cych, zawierajÄ…cego opisy i klasy pewnej liczby obiektĂłw.
+
+\item \textsl{{\large Klasyfikator K najbliĹĽszych sÄ…siadĂłw (KNN)}} \newline
+PrzykĹ‚adem najprostszego klasyfikatora jest klasyfikator K najbliĹĽszych sÄ…siadĂłw (ang. K Nearest Neighbors, KNN). Jest to funkcja, ktĂłra dla rozpatrywanego obiektu, wyszukuje w zbiorze danych uczÄ…cych K obiektĂłw najbardziej do niego podobnych i zwraca etykietÄ™ tej klasy, do ktĂłrej naleĹĽy wiÄ™kszoĹ›Ä‡ z tych K obiektĂłw. CzÄ™sto spotykanym przypadkiem klasyfikacji danych jest klasyfikacja danych wektorowych. Obiekty sÄ… opisywane przez wektory liczb rzeczywistych. WĂłwczas prosty klasyfikator K najbliĹĽszych sÄ…siadĂłw (KNN) polega na policzeniu odlegĹ‚oĹ›ci opisu rozpatrywanego obiektu od opisĂłw kaĹĽdego obiektu ze zbioru danych uczÄ…cych (czÄ™sto stosowana jest odlegĹ‚oĹ›Ä‡ Euklidesowa), a nastÄ™pnie na wybraniu K obiektĂłw o najmniejszych odlegĹ‚oĹ›ciach od x.
+
+\item \textsl{{\large Naiwny klasyfikator bayesowski}} \newline
+Naiwny klasyfikator bayesowski to prosty klasyfikator oparty na wnioskowaniu statystycznym. NaiwnoĹ›Ä‡ klasyfikatora przejawia siÄ™ zaĹ‚oĹĽeniem niezaleĹĽnoĹ›ci zmiennych losowych reprezentujÄ…cych cechy klasyfikowanych obiektĂłw, ktĂłre nie zawsze, a raczej prawie nigdy, nie jest prawdziwe w zagadnieniach rzeczywistych. PopularnoĹ›Ä‡ naiwnego klasyfikatora bayesowskiego wynika z jego prostoty, zarĂłwno konceptualnej jak i obliczeniowej, ktĂłra mimo swoich naiwnych zaĹ‚oĹĽeĹ„ czÄ™sto prowadzi do dosyÄ‡ dobrych wynikĂłw. 
+
+\item \textsl{{\large Drzewa klasyfikacyjne}} \newline
+InnÄ… klasÄ… klasyfikatorĂłw sÄ… cieszÄ…ce siÄ™ duĹĽÄ… popularnoĹ›ciÄ… metody bazujÄ…ce na
+drzewach decyzyjnych (klasyfikacyjnych). W tym przypadku klasyfikator jest reprezentowany przez drzewo binarne, w ktĂłrego wÄ™zĹ‚ach znajdujÄ… siÄ™ pytania o wartoĹ›ci
+okreĹ›lonej cechy, a w liĹ›ciach znajdujÄ… siÄ™ oceny klas.
+
+\item \textsl{{\large Metoda regresji liniowej}} \newline
+GĹ‚Ăłwnym celem regresji jest zbudowanie modelu, ktĂłry podobnie jak model klasyfikacji posĹ‚uĹĽy do predykcji jednej zmiennej na podstawie znanych wartoĹ›ci innych zmiennych. PodstawowÄ… rĂłĹĽnicÄ… pomiÄ™dzy regresjÄ… i klasyfikacjÄ… jest to, ĹĽe w klasyfikacji przewidywana zmienna przyjmuje wartoĹ›Ä‡ kategorycznÄ…, natomiast w regresji celem jest przewidzenie zmiennej przyjmujÄ…cej wartoĹ›Ä‡ ciÄ…gĹ‚Ä… (numerycznÄ…).
+\end{itemize}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Zadanie 1 - Klasyfikacja na bazie modelu regresji liniowej}
+\subsection{WybĂłr i przygotowanie danych}
+
+% przygotowanie danych1
+<<przygotowanie danych1, echo=TRUE, warning=FALSE, message=FALSE>>=
+library("datasets")
+data("iris")
+attach(iris)
+
+ncol(iris) # iloĹ›Ä‡ kolumn
+nrow(iris) #iloĹ›Ä‡ przypadkĂłw
+sapply(iris, class) # identyfikacja cech
+ilebrakujacych<-sum(is.na(iris)) 
+ilebrakujacych # liczba brakujÄ…cych danych
+
+  @
+\subsection{PodziaĹ‚ danych na zbiĂłr uczÄ…cy i testowy}
+% podziaĹ‚ danych
+<<podziaĹ‚ danych, echo=TRUE, warning=FALSE>>=
+n <- dim(iris)[1]
+learn.indx <- sample(1:n,2/3*n)
+learn.set <- iris[learn.indx,] # zbiĂłr uczÄ…cy 
+test.set <- iris[-learn.indx,] # zbiĂłr testowy
+head(learn.set)
+@
+\subsection{Konstrukcja klasyfikatora i wyznaczenie prognoz}
+Definiujemy podstawowe zmienne potrzebne do dalszej pracy.
+%a1
+<<a1, echo=FALSE, warning=FALSE>>=
+etykietki.klas.ucz <-  learn.set$Species
+etykietki.klas.test <- test.set$Species
+# liczba obiektĂłw
+nu <- length(etykietki.klas.ucz)
+nt <-length(etykietki.klas.test)
+# liczba klas
+Ku <- length(levels(etykietki.klas.ucz))
+Kt <- length(levels(etykietki.klas.test))
+@
+Potrzebujemy reprezentacji macierzowej naszych danych. PierwszÄ… kolumnÄ™ wypeĹ‚niamy jedynkami (uwzglÄ™dnienie staĹ‚ej w modelu regresji).
+%a2
+<<a2, echo=TRUE, warning=FALSE>>=
+Xu <- cbind(rep(1,100), learn.set[,1:4])
+Xu <- as.matrix(Xu)
+Xt <- cbind(rep(1,50), test.set[,1:4])
+Xt <- as.matrix(Xt)
+@
+NastÄ™pnie kodujemy poszczegĂłlne klasy. Rezultat umieszczamy w macierzy wskaĹşnikowej Y. Zaczniemy od wygenerowania macierzy zerowej, zmieniajÄ…c zera na jedynki, jeĹĽeli i-ta obserwacja naleĹĽy do j-tej klasy.
+%a3
+<<a3, echo=FALSE, warning=FALSE>>=
+#(macierz wypeĹ‚niona zerami)
+Yu <- matrix(0, nrow=nu, ncol=Ku)
+Yt <- matrix(0, nrow=nt, ncol=Kt)
+# konwersja etykietek klas na wartoĹ›ci numeryczne od 1 do 3
+etykietki.num.u <- as.numeric(etykietki.klas.ucz)
+etykietki.num.t <- as.numeric(etykietki.klas.test)
+for (k in 1:Ku)  
+  Yu[etykietki.num.u==k, k] <- 1
+for (k in 1:Kt)
+  Yt[etykietki.num.t==k, k] <- 1
+
+head(Yu) 
+head(learn.set)
+
+@
+Istotnie, na przykĹ‚adzie pierwszych szeĹ›ciu rekordĂłw, widaÄ‡, ĹĽe kodowanie jest poprawne (setosa - "1", versicolor - "2", virginica - "3"). \newline
+Przedstawimy prognozowane prawdopodobieĹ„stwa przynaleĹĽnoĹ›ci do danych klas obiektĂłw ze zbioru
+%a4
+<<a4, echo=TRUE, warning=FALSE>>=
+B <- solve(t(Xu)%*%Xu) %*% t(Xu) %*% Yu #klasyfikator
+Yu.hat <- Xu%*%B
+Yt.hat <- Xt%*%B
+head(Yu.hat)
+@ 
+PoniĹĽej wykresy prognoz dla zbioru uczÄ…cego i testowego
+%a5
+<<a5, echo=FALSE, warning=FALSE, fig.cap="Prognozy dla zbioru uczÄ…cego">>=
+par(mar = c(4, 4, 4, 1))
+matplot(Yu.hat, main="ZbiĂłr uczÄ…cy",xlab="id", ylim=c(-.5,2),ylab="Prognozy")
+abline(h=c(0.3,0.7), lty=2, col="blue")
+legend(x="topright", legend=paste(1:3,levels(learn.set$Species)), 
+       col=1:3, text.col=1:3, bg="azure2")
+@
+%a6
+<<a6, echo=FALSE, warning=FALSE, fig.cap="Prognozy dla zbioru testowego">>=
+par(mar = c(4, 4, 4, 1))
+matplot(Yt.hat, main="ZbiĂłr testowy",xlab="id", ylim=c(-.5,2), ylab="Prognozy")
+abline(v=c(16,34), lty=2, col="gray")
+legend(x="topright", legend=paste(1:3,levels(test.set$Species)), 
+       col=1:3, text.col=1:3, bg="azure2")
+@
+\newpage 
+Wnioski:
+\begin{itemize}
+\item Na obu wykresach widaÄ‡ wyraĹşne oddzielenie setosy od pozostaĹ‚ych klas.
+\item Wiele obserwacji moĹĽe zostaÄ‡ bĹ‚Ä™dnie sklasyfikowanych (gĹ‚Ăłwnie versicolor i virginica), poniewaĹĽ ich prognozy wynoszÄ… okoĹ‚o 0,5. Na tej podstawie (wspomagajÄ…c siÄ™ obserwacjami) moĹĽemy wnioskowaÄ‡, ĹĽe wystÄ…puje zjawisko maskowania klas. 
+\item Z wykresu dla zbioru uczÄ…cego moĹĽna odczytaÄ‡, ĹĽe obserwacje naleĹĽÄ…ce do klas setosa (1) i virginica (3) bÄ™dÄ… dobrze sklasyfikowane. Dla versicolor (2) mogÄ… wystÄ…piÄ‡ bĹ‚Ä™dy.
+\end{itemize}
+
+\subsection{Ocena jakoĹ›ci modelu}
+Macierz pomyĹ‚ek i poprawnoĹ›Ä‡ dla zbioru uczÄ…cego:
+%a7
+<<a7, echo=FALSE, warning=FALSE>>=
+classu <- levels(learn.set$Species)
+classt <- levels(test.set$Species
+                 )
+maks.indu <- apply(Yu.hat, 1, FUN=function(x) which.max(x))
+maks.indt <- apply(Yt.hat, 1, FUN=function(x) which.max(x))
+
+prognozowane.etykietki <- classu[maks.indu]
+
+
+rzeczywiste.etykietki <- etykietki.klas.ucz
+
+
+macierz.pomylek <- table(rzeczywiste.etykietki, prognozowane.etykietki)
+macierz.pomylek
+sum(diag(macierz.pomylek))/nu
+@
+Macierz pomyĹ‚ek i poprawnoĹ›Ä‡ dla zbioru testowego:
+%a777
+<<a777, echo=FALSE, warning=FALSE>>=
+
+prognozowane.etykietki <- classt[maks.indt]
+rzeczywiste.etykietki <- etykietki.klas.test
+macierz.pomylek <- table(rzeczywiste.etykietki, prognozowane.etykietki)
+macierz.pomylek
+sum(diag(macierz.pomylek))/nt
+@
+
+Wnioski:
+\begin{itemize}
+\item Nasze przypuszczenia okazaĹ‚y siÄ™ sĹ‚uszne, okoĹ‚o 40 \% gatunku versicolor zostaĹ‚o bĹ‚Ä™dnie sklasyfikowanych.
+\item PoprawnoĹ›Ä‡ ksztaĹ‚tuje siÄ™ na poziomie  80\%, jednak czy da siÄ™ uzyskaÄ‡ wiÄ™kszÄ…? 
+\end{itemize}
+
+\subsection{Budowa modelu liniowego dla rozszerzonej przestrzeni cech}
+Zbudujemy nowy model liniowy z dodatkowymi cechami: \newline
+$PL^2, PW^2, SL^2, SW^2, PL*PW, PL*SW, PL*SL, PW*SL, PW*SW, SL*SW$ 
+
+% przygotowanie danych2
+<<przygotowanie danych2, echo=FALSE, warning=FALSE>>=
+iris3<-iris[,1:4]
+names(iris3)[1]<-"SL"
+names(iris3)[2]<-"SW"
+names(iris3)[3]<-"PL"
+names(iris3)[4]<-"PW"
+iris2<-iris
+Species<-iris2$Species
+iris2 <- iris2[,1:4]
+
+
+iris2$Sepal.Length<-iris2$Sepal.Length*iris2$Sepal.Length
+iris2$Sepal.Width<-iris2$Sepal.Width*iris2$Sepal.Width
+iris2$Petal.Length<-iris2$Petal.Length*iris2$Petal.Length
+iris2$Petal.Width<-iris2$Petal.Width*iris2$Petal.Width
+
+names(iris2)[1]<-"SL^2"
+names(iris2)[2]<-"SW^2"
+names(iris2)[3]<-"PL^2"
+names(iris2)[4]<-"PW^2"
+attach(iris2)
+
+SL.SW<-iris$Sepal.Length*iris$Sepal.Width
+SL.PL<-iris$Sepal.Length*iris$Petal.Length
+SL.PW<-iris$Sepal.Length*iris$Petal.Width
+SW.PL<-iris$Sepal.Width*iris$Petal.Length
+SW.PW<-iris$Sepal.Width*iris$Petal.Width
+PL.PW<-iris$Petal.Length*iris$Petal.Width
+
+iris.new<-cbind(iris3,iris2, SL.SW, SL.PL, SL.PW, SW.PL, SW.PW, PL.PW,Species)
+@
+Tak wyglÄ…da nasz nowy zbiĂłr:
+% przygotowanie danych4
+<<przygotowanie danych4, echo=FALSE, warning=FALSE,message=FALSE>>=
+head(iris.new[,-3:-4])
+attach(iris.new)
+@
+
+KrĂłtki opis danych:
+% przygotowanie danych3
+<<przygotowanie danych3, echo=TRUE, warning=FALSE>>=
+
+ncol(iris.new) # iloĹ›Ä‡ kolumn
+nrow(iris.new) #iloĹ›Ä‡ przypadkĂłw
+sapply(iris.new, class) # identyfikacja cech
+ilebrakujacych<-sum(is.na(iris.new)) 
+ilebrakujacych # liczba brakujÄ…cych danych
+@
+
+
+\subsubsection{Klasyfikator, Prognozy i Wnioski}
+Tworzymy zbiĂłr uczÄ…cy, na ktĂłrym skonstruujemy klasyfikator regresji oraz zbiĂłr testowy, na ktĂłrym zweryfikujemy czy stworzony model jest poprawny.
+% podziaĹ‚ danych22
+<<podziaĹ‚ danych22, echo=TRUE, warning=FALSE>>=
+n <- dim(iris.new)[1]
+learn.indx <- sample(1:n,2/3*n)
+
+learn.set <- iris.new[learn.indx,] # zbiĂłr uczÄ…cy
+
+test.set <- iris.new[-learn.indx,] # zbiĂłr testowy
+@
+
+%b1
+<<b1, echo=FALSE, warning=FALSE, massage=FALSE>>=
+etykietki.klas.ucz <-  learn.set$Species
+
+etykietki.klas.test <- test.set$Species
+# liczba obiektĂłw
+nu <- length(etykietki.klas.ucz)
+nt <-length(etykietki.klas.test)
+# liczba klas
+Ku <- length(levels(etykietki.klas.ucz))
+Kt <- length(levels(etykietki.klas.test))
+
+Xu <- cbind(rep(1,100), learn.set[,1:14])
+Xu <- as.matrix(Xu)
+Xt <- cbind(rep(1,50), test.set[,1:14])
+Xt <- as.matrix(Xt)
+
+Yu <- matrix(0, nrow=nu, ncol=Ku)
+
+Yt <- matrix(0, nrow=nt, ncol=Kt)
+# konwersja etykietek klas na wartoĹ›ci numeryczne od 1 do 3
+etykietki.num.u <- as.numeric(etykietki.klas.ucz)
+etykietki.num.t <- as.numeric(etykietki.klas.test)
+
+for (k in 1:Ku)
+  Yu[etykietki.num.u==k, k] <- 1
+for (k in 1:Kt)
+  Yt[etykietki.num.t==k, k] <- 1
+
+@
+
+Wyliczamy klasyfikator ze zbioru uczÄ…cego, a nastÄ™pnie wyznaczamy prognozy dla obydwu zbiorĂłw:
+%b2
+<<b2, echo=TRUE, warning=FALSE>>=
+B <- solve(t(Xu)%*%Xu) %*% t(Xu) %*% Yu #klasyfikator
+Yu.hat <- Xu%*%B
+Yt.hat <- Xt%*%B
+@
+
+PoniĹĽej wykresy prognoz dla zbioru uczÄ…cego i testowego po uzupeĹ‚nieniu wyjĹ›ciowych cech o skĹ‚adniki wielomianowe stopnia 2:
+%b3
+<<b3, echo=FALSE, warning=FALSE, fig.cap="Prognozy dla zbioru uczÄ…cego">>=
+par(mar = c(4, 4, 4, 1))
+matplot(Yu.hat, main="ZbiĂłr uczÄ…cy dla skĹ‚adnikĂłw wielomianowych",
+        xlab="id", ylim=c(-.5,2),ylab="Prognozy")
+legend(x="topright", legend=paste(1:3,levels(learn.set$Species)),
+       col=1:3, text.col=1:3, bg="azure2")
+@
+
+%b4
+<<b4, echo=FALSE, warning=FALSE, fig.cap="Prognozy dla zbioru testowego">>=
+par(mar = c(4, 4, 4, 1))
+matplot(Yt.hat, main="ZbiĂłr testowy dla skĹ‚adnikĂłw wielomianowych",
+        xlab="id", ylim=c(-.5,2), ylab="Prognozy")
+abline(v=c(16,34), lty=2, col="gray")
+legend(x="topright", legend=paste(1:3,levels(test.set$Species)), 
+       col=1:3, text.col=1:3, bg="azure2")
+@
+Wyznaczenie prognoz dla poszczegĂłlnych ID zbioru testowego (badanie maksymalnej wartoĹ›ci etykietki).
+%b5
+<<b5, echo=FALSE, warning=FALSE>>=
+klasy.u <- levels(learn.set$Species)
+klasy.t <- levels(test.set$Species)
+
+#KtĂłra etykietka jest dominujÄ…ca w kaĹĽdym wierszu, gdzie n=50
+maks.ind.u <- apply(Yu.hat, 1, FUN=function(x) which.max(x))
+maks.ind.t <- apply(Yt.hat, 1, FUN=function(x) which.max(x))
+maks.ind.t
+prognozowane.etykietki.u<- klasy.u[maks.ind.u]
+prognozowane.etykietki.t <- klasy.t[maks.ind.t]
+
+@
+Wnioski: 
+\begin{itemize}
+\item WyraĹşny podziaĹ‚ na 3 podzbiory, zgodnie z naszym podziaĹ‚em. 
+\item W tym przypadku nie ma maskowania Ĺ›rodkowej klasy, jednak w 3 zbiorze, dla virginici, widaÄ‡ ĹĽe prognoza dla klasy numer 3 nie zawsze jest najwyĹĽej, tym samym klasa wybrana przez model regresji moĹĽe byÄ‡ niewĹ‚aĹ›ciwa.
+\end{itemize} 
+Sprawdzimy ile z nich jest rozpoznana bĹ‚Ä™dnie, uĹĽywajÄ…c macierzy pomyĹ‚ek. Zaczniemy od zbioru uczÄ…cego:
+%b6
+<<b6, echo=FALSE, warning=FALSE,fig.cap="Macierz">>=
+macierz.pomylek.u <- table(etykietki.klas.ucz, prognozowane.etykietki.u)
+macierz.pomylek.u
+
+print("DokĹ‚adnoĹ›Ä‡ klasyfikacji dla zbioru uczÄ…cego: ") 
+sum(diag(macierz.pomylek.u))/nu
+@
+BĹ‚Ä…d przydzielenia elementu do zĹ‚ej klasy jest bliski $1-3\%$. Jest to o wiele dokĹ‚adniejszy pomiar, niĹĽ w przypadku poprzednich podpunktĂłw. 
+
+SprawdĹşmy zbiĂłr testowy:
+%b8
+<<b8, echo=FALSE, warning=FALSE,fig.cap="Macierz">>=
+macierz.pomylek.t <- table(etykietki.klas.test, prognozowane.etykietki.t)
+macierz.pomylek.t
+
+print("DokĹ‚adnoĹ›Ä‡ klasyfikacji dla zbioru testowego: ") 
+sum(diag(macierz.pomylek.t))/nt
+@
+Prawie wszystkie elementy ze zbioru testowego zostaĹ‚y przydzielone do wĹ‚aĹ›ciwych etykiet.
+
+
+\newline
+\textsl{{\large Podsumowanie i wnioski:}}
+\begin{itemize}
+\item UzupeĹ‚niajÄ…c dane o skĹ‚adniki wielomianowe stopnia 2 uzyskujemy lepsze rezultaty niĹĽ dla danych wyjĹ›ciowych z bĹ‚Ä™dem wynoszÄ…cym maks kilka punktĂłw procentowych. Jest to Ĺ‚atwy sposĂłb na poprawienie dokĹ‚adnoĹ›ci klasyfikatora. 
+\item Pozbywamy siÄ™ takĹĽe efektu maskowania klas.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Zadanie 2 - PorĂłwnanie metod klasyfikacji}
+\subsection{WybĂłr i przygotowanie danych}
+WybraliĹ›my dane z pakietu \textsl{HDclassif} o nazwie "WINE", poniĹĽej krĂłtka charakteryzacja pliku:
+% e1
+<< e1, echo=TRUE, warning=FALSE,message=FALSE >>=
+library(HDclassif)
+data(wine)
+colnames(wine) <- c('Type', 'Alcohol', 'Malic', 'Ash', 
+                      'Alcalinity', 'Magnesium', 'Phenols', 
+                      'Flavanoids', 'Nonflavanoids',
+                      'Proanthocyanins', 'Color', 'Hue', 
+                      'Dilution', 'Proline')
+wine$Type <- as.factor(wine$Type)
+
+
+head(wine)
+ncol(wine) # iloĹ›c kolumn
+nrow(wine) #iloĹ›Ä‡ przypadkĂłw
+sapply(wine, class) # identyfikacja cech
+ilebrakujacych<-sum(is.na(wine)) 
+ilebrakujacych # liczba brakujÄ…cych danych
+
+#procentowu udziaĹ‚ 3 odmian wina
+barplot(prop.table(table(wine$Type)), col=1:3, 
+        main="Dane Wina - rozkĹ‚ad klas", ylim=c(0,0.4))
+@
+Plik zawiera 14 cech i 178 przypadkĂłw, w ktĂłrych kolumny odpowiednio nazywajÄ… siÄ™: 
+\begin{itemize}
+\item Type - Wektor klasowy, trzy rĂłĹĽne odmiany wina reprezentowane przez trzy liczby caĹ‚kowite od 1 do 3.
+\item Alcohol - procent alkoholu
+\item Malic - wskaĹşnik okreĹ›lajÄ…cy jabĹ‚kowoĹ›Ä‡
+\item Ash - wskaĹşnik winny mÄ™tnoĹ›ci
+\item Alcalinity - AlkalicznoĹ›Ä‡
+\item Magnesium - Magnez
+\item Phenols - Fenole
+\item Flavanoids - Flawanoidy
+\item Nonflavanoids - Nieflawanoidy
+\item Proanthocyanins - Proantocyjaniny
+\item Color - Kolor
+\item Hue - OdcieĹ„
+\item Dilution - RoztwĂłr
+\item Proline - Prolina
+\end{itemize}
+Zaczniemy od sprawdzenia zmiennoĹ›ci cech. JeĹ›li wariancje poszczegĂłlnych zmiennych bÄ™dÄ… zbyt zrĂłĹĽnicowane, wtedy konieczna bÄ™dzie standaryzacja.
+
+% e2
+<< e2, echo=FALSE, warning=FALSE,message=FALSE >>=
+library("plyr")
+colwise(var)(wine[2:14])
+@
+Obserwacje: Wariancje wyjĹ›ciowych zmiennych sÄ… bardzo zrĂłĹĽnicowane. Celem unikniÄ™cia dominacji zmiennej o bardzo duĹĽej
+wariancji (zmienna Proline) przeprowadzimy standaryzacjÄ™.
+% e3
+<< e3, echo=FALSE, warning=FALSE,message=FALSE,fig.cap="Rozrzut zmiennych przed standaryzacjÄ…" >>=
+etykietki<-wine$Type
+etykietki<-data.frame(etykietki)
+wine1<-wine[,-1]
+wine1
+wine2<-wine1[6:7]
+wine2<-cbind(etykietki, wine2)
+wine1<-scale(wine1)
+wine1<-data.frame(wine1)
+par(mfrow=c(2,1), mar=c(2,2,2,2))
+boxplot(wine$Alcohol, wine$Nonflavanoids, wine$Color, wine$Proline, names = c("Alcohol", "Nonflavanoids","Color", "Proline"),
+col = c("orange","red","yellow","pink"),main="Boxplot dla 4 zmiennych przed standaryzacjÄ…")
+@
+% e33
+<< e33, echo=FALSE, warning=FALSE,message=FALSE,fig.cap="Rozrzut zmiennych po standaryzacji" >>=
+boxplot(wine1$Alcohol, wine1$Nonflavanoids, wine1$Color, wine1$Proline, names = c("Alcohol", "Nonflavanoids","Color", "Proline"),
+col = c("orange","red","yellow","pink"),main="Boxplot dla 4 zmiennych po standaryzacji")
+@
+ZdolnoĹ›ci dyskryminacyjne zmiennych:
+% e4
+<< e4, echo=FALSE, warning=FALSE,message=FALSE,fig.cap="ZdolnoĹ›ci dyskryminacyjne poszczegĂłlnych zmiennych" >>=
+attach(wine1)
+par(mfrow=c(3,2))
+par(mar=c(3, 4, 1, 1))
+
+boxplot(Alcohol~wine$Type, col=1:3)
+boxplot(Malic~wine$Type, col=1:3)
+boxplot(Ash~wine$Type, col=1:3)
+boxplot(Alcalinity~wine$Type, col=1:3)
+boxplot(Phenols~wine$Type, col=1:3)
+boxplot(Flavanoids~wine$Type, col=1:3)
+boxplot(Nonflavanoids~wine$Type, col=1:3)
+boxplot(Proanthocyanins~wine$Type, col=1:3)
+boxplot(Color~wine$Type, col=1:3)
+boxplot(Hue~wine$Type, col=1:3)
+boxplot(Dilution~wine$Type, col=1:3)
+boxplot(Proline~wine$Type, col=1:3)
+@
+Wniosek: Najlepszymi cechami do separacji klas sÄ… Phenols i Flavanoids. 
+
+\subsubsection{PodziaĹ‚ danych na zbiĂłr uczÄ…cy i testowy}
+Stworzymy 2 zbiory uczÄ…cÄ™ i 2 zbiory testowe. W jednym znajdÄ… siÄ™ wszystkie cechy, w drugim zaĹ› te o najlepszej zdolnoĹ›ci dyskryminacyjnej (Phenols i Flavanoids).
+% podziaĹ‚ danych1
+<<podziaĹ‚ danych1, echo=TRUE, warning=FALSE>>=
+etykietki<-wine$Type
+etykietki<-data.frame(etykietki)
+wine2<-cbind(etykietki, wine1)
+
+np <- dim(wine2)[1]
+learn.indx.all <- sample(1:np,2/3*np)
+learn.set.all <- wine2[learn.indx.all,] # zbiĂłr uczÄ…cy wszystkich zmiennych
+test.set.all <- wine2[-learn.indx.all,] # zbiĂłr testowy wszystkich zmiennych
+
+wine3<-wine2[7:8]
+wine3<-cbind(etykietki, wine3)
+
+etykietki.learn.all<-learn.set.all$etykietki
+etykietki.test.all <- test.set.all$etykietki
+
+n2 <-dim(wine3)[1]
+learn.indx.subset <- sample(1:n2,2/3*n2)
+learn.set.subset <- wine3[learn.indx.subset,] # zbiĂłr uczÄ…cy pozdbioru danych
+test.set.subset <- wine3[-learn.indx.subset,] # zbiĂłr testowy pozdbioru danych
+
+etykietki.learn.subset<-learn.set.subset$etykietki
+etykietki.test.subset <- test.set.subset$etykietki
+
+@
+Przeprowadzimy analizÄ™ trzema metodami na wyĹĽej pokazanych podzbiorach. PorĂłwnamy uzyskane rezultaty i postaramy siÄ™ wybraÄ‡ najlepszÄ… z metod, badajÄ…c przy tym rĂłĹĽne przypadki poboczne. 
+\subsection{Naiwny Bayes}
+Wyznaczamy macierz pomyĹ‚ek i bĹ‚Ä…d klasyfikacyjny dla metody naiwnego Bayesa. Na poczÄ…tek przeanalizujemy wyjĹ›ciowy zbiĂłr danych z podziaĹ‚em na zbiĂłr uczÄ…cy i testowy.
+\newline 
+Macierz pomyĹ‚ek i bĹ‚Ä…d dla zbioru uczÄ…cego wyjĹ›ciowych danych:
+%d1
+<<d1, echo=FALSE, warning=FALSE>>=
+library(klaR)
+library("e1071")
+
+NBall <- naiveBayes(learn.set.all$etykietki~., data = learn.set.all)
+
+NBsub <- naiveBayes(learn.set.subset$etykietki~., data=learn.set.subset)
+
+# prognozy dla zbioru uczÄ…cego
+etykietki.prog.learn.all <- predict(NBall, learn.set.all)
+etykietki.prog.learn.subset <- predict(NBsub, learn.set.subset)
+
+# prognozy dla zbioru testowego
+etykietki.prog.test.all <- predict(NBall, test.set.all)
+etykietki.prog.test.subset <- predict(NBsub, test.set.subset)
+
+blad.klasyf <- function(etykietki.prog, etykietki)
+{
+  n <- length(etykietki.prog)
+  macierz.pomylek <- table(etykietki.prog,etykietki)
+  list(macierz.pomylek=macierz.pomylek, blad.klasyf=(n - sum(diag(macierz.pomylek))) / n)
+}
+blad.klasyf(etykietki.prog.learn.all, etykietki.learn.all)
+@
+Macierz pomyĹ‚ek i bĹ‚Ä…d dla zbioru testowego wyjĹ›ciowych danych:
+%d11
+<<d11, echo=FALSE, warning=FALSE>>=
+blad.klasyf(etykietki.prog.test.all, etykietki.test.all)
+@
+NastÄ™pnie rozwaĹĽymy podzbiĂłr danych wyjĹ›ciowych z cechami o najlepszej zdolnoĹ›ci dyskryminacyjnej.
+\newline 
+Macierz pomyĹ‚ek i bĹ‚Ä…d dla zbioru uczÄ…cego pozdbioru wyjĹ›ciowych danych:
+%d111
+<<d111, echo=FALSE, warning=FALSE>>=
+blad.klasyf(etykietki.prog.learn.subset, etykietki.learn.subset)
+@
+Macierz pomyĹ‚ek i bĹ‚Ä…d dla zbioru testowego pozdbioru wyjĹ›ciowych danych:
+%d1111
+<<d1111, echo=FALSE, warning=FALSE>>=
+blad.klasyf(etykietki.prog.test.subset, etykietki.test.subset)
+@
+Wnioski:
+\begin{itemize}
+\item Analiza caĹ‚ego zbioru: Podobne, niemal identyczne wyniki zbiorĂłw uczÄ…cego i testowego. BĹ‚Ä…d ksztaĹ‚tuje siÄ™ w okolicach 2\%, co jest Ĺ›wietnym rezultatem.
+\item Analiza podzbioru cech o najlepszych zdolnoĹ›ciach dyskryminacyjnych: Wyniki rĂłwnieĹĽ sÄ… podobne dla obu zbiorĂłw, jednak na wiele niĹĽszym poziomie, bowiem bĹ‚Ä…d wynosi okoĹ‚o 20\%
+\end{itemize}
+
+
+Otrzymane wyniki porĂłwnamy z tymi uzyskami dziÄ™ki algorytmowi "bootstrap":
+
+%d2
+<<d2, echo=TRUE, warning=FALSE>>=
+library(ipred)
+#Wine3-pozdbiĂłr wyjĹ›ciowych danych z cechami o najlepszej zdolnoĹ›ci dyskryminacyjnej, 
+#bez podziaĹ‚u na zbiĂłr uczÄ…cy i testowy
+
+#Wine2-wyjĹ›ciowe dane po standaryzacji
+
+my.predict  <- function(model, newdata) 
+{ predict(model, newdata=newdata, type="class") }
+
+my.naiveBayes <- function(formula, data) 
+{ naiveBayes(formula=formula,data=data)}  
+
+#Testujemy model dla nboot=50, nboot=3 
+(blad.bootstrap <- errorest(etykietki~., wine3, model=my.naiveBayes, predict=my.predict,
+ estimator="boot", est.para=control.errorest(nboot = 50)))
+
+(blad.bootstrap <- errorest(etykietki~., wine3, model=my.naiveBayes, predict=my.predict,
+ estimator="boot", est.para=control.errorest(nboot = 3)))
+
+(blad.bootstrap <- errorest(etykietki~., wine2, model=my.naiveBayes, predict=my.predict,
+ estimator="boot", est.para=control.errorest(nboot = 50)))
+
+(blad.bootstrap <- errorest(etykietki~., wine2, model=my.naiveBayes, predict=my.predict,
+ estimator="boot", est.para=control.errorest(nboot = 3)))
+
+(blad.cv <- errorest(etykietki~., wine3, model=my.naiveBayes, predict=my.predict,
+            estimator="cv", est.para=control.errorest(k = 5)))
+
+(blad.cv <- errorest(etykietki~., wine3, model=my.naiveBayes, predict=my.predict, 
+            estimator="cv", est.para=control.errorest(k = 100)))
+@
+Wnioski:
+\begin{itemize}
+\item Algorytm "bootstrap" uzyskujemy podobne do siebie rezultaty, bez wzglÄ™du na wartoĹ›Ä‡ parametru nboot (testowane dla nboot=3 oraz nboot=50) zarĂłwno dla zbioru wyjĹ›ciowego jak i podzbioru z danymi o najlepszej zdolnoĹ›ci dyskryminacyjnej. Maksymalna rĂłĹĽnica wynosi kilka punktĂłw procentowych.
+\item Wyniki otrzymanÄ™ metodÄ… "bootstrap" sÄ… praktycznie identyczne jak te otrzymane macierzÄ… pomyĹ‚ek. Maksymalny bĹ‚Ä…d szacujemy na 1\%.
+\item Algorytm "cross validation" daje niemal identyczne rezultaty jak algorytm "bootstrap" (dla rĂłĹĽnych wartoĹ›ci k)
+\end{itemize}
+\subsection{Metoda k-NN}
+Zaczniemy od analizy wyjĹ›ciowego zbioru. 
+% e48
+<< e48, echo=FALSE, warning=FALSE,message=FALSE >>=
+library(ipred)
+
+# budujemy model
+model.knn.1 <- ipredknn(etykietki~ ., data=learn.set.all, k=5) #na zbiorze uczÄ…cym caĹ‚ym
+
+
+# sprawdĹşmy jakoĹ›Ä‡ modelu
+# uwaga: czasami funkcje "predict" dziaĹ‚ajÄ… niestandardowo
+etykietki.prog.learn.all<- predict(model.knn.1, learn.set.all,type="class")
+etykietki.prog.test.all<- predict(model.knn.1, test.set.all,type="class")
+
+# macierz pomyĹ‚ek (ang. confusion matrix)
+wynik.tablica.test.all <- table(etykietki.prog.learn.all,etykietki.learn.all)
+wynik.tablica.learn.all <- table(etykietki.prog.test.all,etykietki.test.all)
+# bĹ‚Ä…d klasyfikacji
+blad.klasyf <- function(etykietki.prog, etykietki.rzecz)
+{
+  n <- length(etykietki.prog)
+  macierz.pomylek <- table(etykietki.prog,etykietki.rzecz)
+  list(macierz.pomylek=macierz.pomylek, blad.klasyf=(n - sum(diag(macierz.pomylek))) / n)
+}
+(blad.klasyf(etykietki.prog.learn.all, etykietki.learn.all))
+(blad.klasyf(etykietki.prog.test.all, etykietki.test.all))
+@
+
+Model dla zbiorĂłw o najlepszej zdolnoĹ›ci dyskryminacyjnej:
+% e47
+<< e47, echo=TRUE, warning=FALSE,message=FALSE >>=
+# budujemy model
+model.knn.2 <- ipredknn( etykietki~ ., data=learn.set.subset, k=5) #na zbiorze uczÄ…cym caĹ‚ym
+
+
+etykietki.prog.learn.subset<- predict(model.knn.2, learn.set.subset,type="class")
+etykietki.prog.test.subset<- predict(model.knn.2, test.set.subset,type="class")
+
+
+(blad.klasyf(etykietki.prog.learn.subset, etykietki.learn.subset))
+(blad.klasyf(etykietki.prog.test.subset, etykietki.test.subset))
+@
+Wnioski:
+\begin{itemize}
+\item Analiza dla wyjĹ›ciowego zbioru: WystÄ™puje istotna rĂłĹĽnica na poziomie kilku punktĂłw procentowych miÄ™dzy zbiorem uczÄ…cym a testowym, ktĂłra nie wystÄ™powaĹ‚a w metodzie naiwnego Bayesa.
+\item Analiza podzbioru cech o najlepszych zdolnoĹ›ciach dyskryminacyjnych: WciÄ…ĹĽ wystÄ™puje rĂłĹĽnica w bĹ‚Ä™dach, jednak nie jest juĹĽ tak istotna, mimo wszystko nie wystÄ™powaĹ‚a ona w metodzie Bayesa. 
+\item Test byĹ‚ wykonywany dla k=5, moĹĽe siÄ™ okazaÄ‡, ĹĽe nie jest to optymalna liczba.
+\end{itemize}
+
+Badanie jakoĹ›ci klasyfikacji dla rĂłĹĽnych kombinacji danych (bez podziaĹ‚u na zbiory uczÄ…ce i testowe), ale dla rĂłĹĽnej liczby najbliĹĽszych sÄ…siadĂłw (testowane k=1, k=20 i k=100):
+% e46
+<< e46, echo=TRUE, warning=FALSE,message=FALSE >>=
+#Wine3-pozdbiĂłr wyjĹ›ciowych danych z cechami o najlepszej zdolnoĹ›ci dyskryminacyjnej, 
+#bez podziaĹ‚u na zbiĂłr uczÄ…cy i testowy
+
+#Wine2-wyjĹ›ciowe dane po standaryzacji
+my.predict  <- function(model, newdata) predict(model, newdata=newdata, type="class")
+my.ipredknn <- function(formula1, data1, ile.sasiadow) ipredknn(formula=formula1,data=data1,k=ile.sasiadow)
+attach(wine2)
+
+errorest(etykietki ~., wine2, model=my.ipredknn, predict=my.predict, estimator="boot", 
+         est.para=control.errorest(nboot = 50), ile.sasiadow=1)
+errorest(etykietki ~., wine2, model=my.ipredknn, predict=my.predict, estimator="boot", 
+         est.para=control.errorest(nboot = 50), ile.sasiadow=20)
+errorest(etykietki ~., wine2, model=my.ipredknn, predict=my.predict, estimator="boot", 
+         est.para=control.errorest(nboot = 50), ile.sasiadow=100)
+
+
+
+errorest(etykietki ~., wine3, model=my.ipredknn, predict=my.predict, estimator="boot", 
+         est.para=control.errorest(nboot = 50), ile.sasiadow=1)
+errorest(etykietki ~., wine3, model=my.ipredknn, predict=my.predict, estimator="boot", 
+         est.para=control.errorest(nboot = 50), ile.sasiadow=20)
+errorest(etykietki ~., wine3, model=my.ipredknn, predict=my.predict, estimator="boot", 
+         est.para=control.errorest(nboot = 50), ile.sasiadow=100)
+@
+Wnioski:
+\begin{itemize}
+\item WyjĹ›ciowy zbiĂłr: Dla k=1 bĹ‚Ä…d na poziomie 5\%, dla k=20 na poziomie 4\%, dla k=100 aĹĽ 15\%.  
+\item PozdbiĂłr z cechami o najlepszych zdolnoĹ›ciach dyskryminacyjnych: BĹ‚Ä…d dla k=1 bliski 30\%, dla k=20 okoĹ‚o 22\%, k=100 okoĹ‚o 40\%. Tutaj rĂłĹĽnica jest wyraĹşna. 
+\item ZwiÄ™kszenie k powoduje zmniejszenie bĹ‚Ä™du, ale tylko do pewnego momentu. Zatem istnieje takie k, dla ktĂłrego analiza jest optymalna. W dalszej analizie przyjmujemy k=20 jako optymalne. 
+\item Dla k=1 bĹ‚Ä…d jest niewielki, jednak tutaj mamy duĹĽÄ… losowoĹ›Ä‡.
+\end{itemize}
+
+Dowolne podzbiory danych dla takiego samego k=20:
+% e466
+<< e466, echo=FALSE, warning=FALSE,message=FALSE >>=
+#Dowolne podzbiory:
+errorest(etykietki ~ Ash + Alcalinity + Proline + Hue, wine2, model=my.ipredknn, predict=my.predict, estimator="boot", 
+         est.para=control.errorest(nboot = 50), ile.sasiadow=20)
+#Dodajemy 1 cechÄ™ o wysokiej zdolnoĹ›ci dyskryminacyjnej
+errorest(etykietki ~ Ash + Hue + Flavanoids + Proline , wine2, model=my.ipredknn, predict=my.predict, estimator="boot", 
+         est.para=control.errorest(nboot = 50), ile.sasiadow=20)
+@
+Obserwacje:
+\begin{itemize}
+\item Po zamianie jednej z cech zbioru na cechÄ™ majÄ…cÄ… wysokie zdolnoĹ›ci dyskryminacyjne bĹ‚Ä…d klasyfikacji maleje o poĹ‚owÄ™. 
+\end{itemize}
+
+Sprawdzimy, czy dodanie kolejnej cechy o wysokiej zdolnoĹ›ci dyskryminacyjnej znowu zmniejszy bĹ‚Ä…d.
+% e44
+<< e44, echo=FALSE, warning=FALSE,message=FALSE >>=
+errorest(etykietki ~ Ash + Hue + Flavanoids + Proline + Phenols, wine2, model=my.ipredknn, predict=my.predict, estimator="boot", 
+         est.para=control.errorest(nboot = 50), ile.sasiadow=20)
+errorest(etykietki ~ Phenols + Hue + Flavanoids + Ash , wine2, model=my.ipredknn, predict=my.predict, estimator="boot", 
+         est.para=control.errorest(nboot = 50), ile.sasiadow=20)
+@
+Obserwacje:
+\begin{itemize}
+\item Dodanie kolejnej cechy o wysokiej zdolnoĹ›ci dyskryminacyjnej nie zmniejsza bĹ‚Ä™du.
+\item UsuniÄ™cie zmiennej Proline znacznie zwiÄ™ksza bĹ‚Ä…d.
+\end{itemize}
+
+Wnioski:
+\begin{itemize}
+\item Model z cechami o wysokiej zdolnoĹ›ci dyskryminacyjnej nie musi minimalizowaÄ‡ bĹ‚Ä™du klasyfikacyjnego.
+\item Istotny wpĹ‚yw zmiennej Proline na poziom bĹ‚Ä™du klasyfikacyjnego (dlaczego?).
+\end{itemize}
+
+Wykres zaleĹĽnoĹ›ci prognozowanych i rzeczywistych etykiet (tu zmienne Flavanoids i Proline)
+% e54
+<< e54, echo=FALSE, warning=FALSE,message=FALSE, fig.cap="Prognozy">>=
+library(klaR)
+
+partimat(etykietki~Flavanoids + Proline , data = wine2, method = "sknn",  plot.matrix = FALSE, imageplot = TRUE, main = "PorĂłwnanie etykiet rzeczywistych z prognozami")
+
+@
+Kolorowe obszary oznaczajÄ… prognozowane etykiety. Na niebiesko - (1), fioletowo - (2), biaĹ‚o - (3)
+
+\subsection{Metoda drzew klasyfikacyjnych}
+Wyznaczenie drzewa i klasyfikatora:
+\newline
+Stworzymy dwa modele. Jeden ze wszystkimi danymi w zbiorze, a drugi z wybranym podzbiorem. Model pierwszy zastosujemy do analizy danych wyjĹ›ciowych oraz do podzbioru danych z cechami o najlepszej zdolnoĹ›ci dyskryminacyjnej.  Natomiast model drugi, zbudowanych na wybranych cechach, przeanalizujemy na danych wyjĹ›ciowych i porĂłwnanym, jakie znaczenie ma iloĹ›Ä‡ zmiennych przy tworzeniu modelu klasyfikatora metodÄ… drzew.
+% e544
+<< e544, echo=TRUE, warning=FALSE, message=FALSE>>=
+library(MASS)
+library(rpart)
+library(rpart.plot)
+library(klaR)
+attach(wine2)
+set.seed(1) # ustalamy ziarno generatora aby otrzymaÄ‡ powtarzalne wyniki
+n.learn.all <- nrow(learn.set.all)
+n.learn.subset<-nrow(learn.set.subset)
+
+n.test.all <- nrow(test.set.all)
+n.test.subset <- nrow(test.set.subset)
+model<- etykietki~ .   #model klasyczny
+#model 2
+model.all.1 <- etykietki ~ Proline + Phenols + Hue + Flavanoids
+
+
+# budujemy drzewo 
+tree.all <- rpart(model, data=learn.set.all, control=rpart.control(cp=.03, minsplit=10, maxdepth=10))
+tree.all.1 <- rpart(model.all.1, data=learn.set.all, control=rpart.control(cp=.03, minsplit=10, maxdepth=10))
+tree.subset <- rpart(model, data=learn.set.subset, control=rpart.control(cp=.03, minsplit=10, maxdepth=10))
+
+rpart.plot(tree.all)
+rpart.plot(tree.all.1)
+rpart.plot(tree.subset)
+@
+
+
+% e589
+<< e589, echo=FALSE, warning=FALSE, message=FALSE>>=
+# prognozy dla zbiorĂłw uczÄ…cych
+prog.learn.all <- predict(tree.all, newdata=learn.set.all, type = "class")
+prog.learn.subset<-predict(tree.subset, newdata=learn.set.subset, type = "class")
+
+# prognozy dla zbiorĂłw testowych
+prog.test.all<-predict(tree.all, newdata=test.set.all, type = "class")
+prog.test.subset <- predict(tree.subset, newdata=test.set.subset, type = "class")
+
+#prognozy dla modelu 2
+prog.all.1.learn<-predict(tree.all.1, newdata=learn.set.all, type = "class")
+prog.all.1.test<-predict(tree.all.1, newdata=test.set.all, type = "class")
+
+# prawdopodobienstwo a posteriori dla testu na caĹ‚ym zbiorze uczÄ…cym
+pred.probs.test.all <- predict(tree.all, newdata=test.set.all, type = "prob")
+pred.probs.test.subset<-predict(tree.subset, newdata=test.set.subset, type = "prob")
+@
+Wnioski: 
+\begin{itemize}
+\item NajwiÄ™ksze znaczenie w klasyfikowaniu ma zmienna Proline, kolejnymi zmiennymi sÄ… Duration i Phenols, jeĹ›li rozwaĹĽamy zbiĂłr danych wyjĹ›ciowych, podobne zjawisko wystÄ™puje w modelu drugim.
+\item Proline i Phenols majÄ… zaleĹĽnoĹ›Ä‡ decydujÄ…cÄ… na poziomie zera, pamiÄ™tay ĹĽe dane ulegĹ‚y standaryzacji, wiÄ™ moĹĽemy uznaÄ‡, ĹĽe zmienna Proline dzieli drzewko na dwie iloĹ›ciwo podobne zbiory
+\item AnalizujÄ…c drzewo z danymi o najlepszej zdolnoĹ›ci dyskryminacyjnej, widzimy ĹĽe klasa 3 jest mocno oddzielona od klas 1 oraz 2
+\end{itemize}
+Macierze pomyĹ‚ek:
+\newline 
+\newline
+Analiza dla danych wyjĹ›ciowych:
+<< e5893, echo=TRUE, warning=FALSE, message=FALSE>>=
+# macierz pomyĹ‚ek dla zbioru uczÄ…cego
+conf.mat.learn.all <- table(prog.learn.all, etykietki.learn.all)
+conf.mat.learn.all
+(error.learn.all <- (n.learn.all - sum(diag(conf.mat.learn.all))) / n.learn.all)
+# macierz pomyĹ‚ek dla zbioru testowego
+conf.mat.test.all <- table(prog.test.all, etykietki.test.all)
+conf.mat.test.all
+(error.rate.test <- (n.test.all - sum(diag(conf.mat.test.all))) / n.test.all)
+@
+
+
+Analiza dla danych o najwiÄ™kszych zdolnoĹ›ciach dyskryminacyjnych:
+% e58934
+<< e58934, echo=TRUE, warning=FALSE, message=FALSE>>=
+# macierz pomyĹ‚ek dla zbioru uczÄ…cego
+conf.mat.learn.subset<-table(prog.learn.subset, etykietki.learn.subset)
+conf.mat.learn.subset
+(error.learn.subset <- (n.learn.subset - sum(diag(conf.mat.learn.subset))) / n.learn.subset)
+# macierz pomyĹ‚ek dla zbioru testowego
+conf.mat.test.subset<-table(prog.test.subset, etykietki.test.subset)
+conf.mat.test.subset
+(error.rate.test.subset <- (n.test.subset - sum(diag(conf.mat.test.subset))) / n.test.subset)
+@
+
+Analiza danych wyjĹ›ciowych w drugim modelu:
+% e58935
+<< e58935, echo=TRUE, warning=FALSE, message=FALSE>>=
+#macierz pomyĹ‚ek dla modelu 2
+#ZbiĂłt uczÄ…cy
+conf.mat.all.1.learn<-table(prog.all.1.learn, etykietki.learn.all)
+conf.mat.all.1.learn
+(error.learn.1.all <- (n.learn.all - sum(diag(conf.mat.all.1.learn))) / n.learn.all)
+
+#ZbiĂłr testowy
+conf.mat.all.1.test<-table(prog.all.1.test, etykietki.test.all)
+conf.mat.all.1.test
+(error.rate.1.test <- (n.test.all - sum(diag(conf.mat.all.1.test))) / n.test.all)
+@
+Wnioski:
+\begin{itemize}
+\item Stosunkowa wysoka rĂłĹşnica pomiÄ™dzy zbiorem testowym, a uczÄ…cym w danych wyjĹ›ciowych w obu modelach. 
+\item Model 2 zastosowany na mniejszej iloĹ›ci danych niewiele rĂłĹĽni siÄ™ w stosunku do modelu na wszystkich zmiennych, wnioskujemy ĹĽe gĹ‚Ăłwnymi zmiennymi, ktĂłre w znacznym stopniu klasyfikujÄ… drzewo to Proline oraz Phenols
+\item Tak jak w innych klasyfikatorach istnieje spora niedokĹ‚adnoĹ›Ä‡ dla zbioru o najlpeszych cechach dyskryminacyjnych, dla obu zbiorĂłw (uczÄ…cy i testowy) wynosi ona okoĹ‚o 18\%
+\end{itemize}
+
+
+
+\subsection{Podsumowanie i wnioski}
+Podsumowanie:
+\begin{itemize}
+\item Naiwny Bayes:
+\newline -Analiza caĹ‚ego zbioru: BĹ‚Ä…d na poziomie 2\%
+\newline -Analiza podzbioru cech o najlepszych zdolnoĹ›ciach dyskryminacyjnych: BĹ‚Ä…d na poziomie 20\%
+\item k-NN:
+\newline -Analiza caĹ‚ego zbioru: BĹ‚Ä…d poniĹĽej 2\%
+\newline -Analiza podzbioru cech o najlepszych zdolnoĹ›ciach dyskryminacyjnych: BĹ‚Ä…d na poziomie 18-23\%
+\item Drzewa klasyfikacyjne:
+\newline -Analiza caĹ‚ego zbioru: BĹ‚Ä…d na poziomie 7-10\%
+\newline -Analiza podzbioru cech o najlepszych zdolnoĹ›ciach dyskryminacyjnych: BĹ‚Ä…d na poziomie 14-22\%
+\end{itemize}
+Wnioski:
+\begin{itemize}
+\item Metoda naiwnego Bayesa oraz k-NN daje bardzo zbliĹĽone, niemal identyczne rezultaty. 
+\item Metoda drzew klasyfikacyjnych gorzej radzi sobie gdy analizujemy caĹ‚y zbiĂłr, jednak daje szansÄ™ na zmniejszenie bĹ‚Ä™du, gdy ograniczymy siÄ™ do podzbioru cech o najlepszych zdolnoĹ›ciach dyskryminacyjnych.
+\end{itemize}
+\end{document}
+
+
+
+
